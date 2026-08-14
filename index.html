@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Wanderwise — AI Road-Trip Concierge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+  :root{
+    --bg:#eef2f7; --card:#ffffff; --ink:#0f172a; --muted:#5b6472; --line:#e6eaf0;
+    --brand:#0d9488; --brand-d:#0b7c72; --accent:#4f46e5; --amber:#b9770e;
+    --amber-bg:#fdf3e2; --green:#0f766e; --red:#c0392b; --red-bg:#fbe9e7;
+    --shadow:0 1px 2px rgba(16,24,40,.04),0 8px 24px rgba(16,24,40,.06);
+    --radius:16px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink);}
+  a{color:inherit}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+
+  header{background:linear-gradient(135deg,#0b1220 0%,#123a37 60%,#0d9488 140%);color:#fff}
+  .nav{display:flex;align-items:center;justify-content:space-between;padding:16px 0}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:800;letter-spacing:.2px;font-size:19px}
+  .logo{width:30px;height:30px;border-radius:9px;background:conic-gradient(from 210deg,#2dd4bf,#4f46e5,#2dd4bf);
+        box-shadow:inset 0 0 0 3px rgba(255,255,255,.15)}
+  .nav small{color:#bfe9e3;font-weight:500}
+  .hero{padding:34px 0 92px}
+  .hero h1{font-size:clamp(26px,4vw,40px);line-height:1.1;margin:0 0 10px;font-weight:800}
+  .hero p{margin:0;max-width:640px;color:#d6e7e4;font-size:16px}
+
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+  .form{margin-top:-64px;padding:20px;display:grid;grid-template-columns:1.1fr 1.1fr .8fr 1fr auto;gap:14px;align-items:end}
+  .field{display:flex;flex-direction:column;gap:6px;min-width:0}
+  .field label{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+  .field input,.field select{padding:12px 13px;border:1px solid var(--line);border-radius:11px;font:inherit;background:#fbfcfe;color:var(--ink)}
+  .field input:focus,.field select:focus{outline:2px solid #cdeae6;border-color:var(--brand)}
+  .go{background:var(--brand);color:#fff;border:0;border-radius:11px;padding:13px 20px;font-weight:700;font-size:15px;cursor:pointer;white-space:nowrap;box-shadow:var(--shadow)}
+  .go:hover{background:var(--brand-d)}
+  .go:disabled{opacity:.6;cursor:progress}
+
+  main{padding:26px 0 70px}
+  .hint{color:var(--muted);font-size:14px;margin:16px 4px}
+
+  /* loading */
+  .loader{display:none;padding:26px;margin-top:22px}
+  .loader.on{display:block}
+  .steps{display:flex;flex-wrap:wrap;gap:10px}
+  .step{display:flex;align-items:center;gap:9px;font-size:14px;color:var(--muted);padding:9px 13px;border:1px solid var(--line);border-radius:999px;background:#fbfcfe}
+  .dot{width:9px;height:9px;border-radius:50%;background:#cbd5e1}
+  .step.act .dot{background:var(--brand);box-shadow:0 0 0 4px #cdeae6}
+  .step.done{color:var(--ink)} .step.done .dot{background:var(--green)}
+
+  .err{display:none;margin-top:22px;padding:16px 18px;border-radius:12px;background:var(--red-bg);color:var(--red);border:1px solid #f3c9c1;font-weight:600}
+  .err.on{display:block}
+
+  #out{display:none} #out.on{display:block}
+  .grid{display:grid;gap:18px}
+  .headline{padding:22px}
+  .headline h2{margin:0 0 6px;font-size:24px}
+  .headline p{margin:0;color:var(--muted)}
+  .chips{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+  .chip{display:flex;flex-direction:column;padding:11px 15px;border-radius:12px;background:#f3f7f6;border:1px solid var(--line);min-width:120px}
+  .chip b{font-size:18px} .chip span{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+
+  .two{display:grid;grid-template-columns:1.35fr 1fr;gap:18px}
+  #map{height:380px;border-radius:var(--radius);border:1px solid var(--line);box-shadow:var(--shadow)}
+  .wcards{display:grid;gap:14px}
+  .wcard{padding:16px;border-radius:14px;border:1px solid var(--line);box-shadow:var(--shadow);background:#fff}
+  .wcard .top{display:flex;align-items:center;justify-content:space-between}
+  .wcard h4{margin:0;font-size:15px} .wcard .ico{font-size:30px;line-height:1}
+  .wcard .t{font-size:28px;font-weight:800} .wcard .meta{color:var(--muted);font-size:13px;margin-top:2px}
+
+  .sec{padding:22px}
+  .sec h3{margin:0 0 4px;font-size:18px;display:flex;align-items:center;gap:9px}
+  .sec .sub{color:var(--muted);font-size:13px;margin:0 0 16px}
+  .icn{width:26px;height:26px;border-radius:8px;display:inline-grid;place-items:center;background:#eef7f5;font-size:15px}
+
+  .timeline{position:relative;margin-left:8px;padding-left:22px;border-left:2px dashed #cfe0dd}
+  .tl{position:relative;padding:0 0 18px}
+  .tl:last-child{padding-bottom:0}
+  .tl::before{content:"";position:absolute;left:-30px;top:2px;width:14px;height:14px;border-radius:50%;background:#fff;border:3px solid var(--brand)}
+  .tl .tm{font-weight:700;font-size:13px;color:var(--brand-d)}
+  .tl .ti{font-weight:600} .tl .td{color:var(--muted);font-size:14px}
+
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .cards.two2{grid-template-columns:repeat(2,1fr)}
+  .c{padding:15px;border:1px solid var(--line);border-radius:14px;background:#fff}
+  .c .k{font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);font-weight:600}
+  .c .n{font-weight:700;margin:3px 0 4px}
+  .c .m{font-size:13px;color:var(--muted)} .c .w{font-size:14px;margin-top:8px}
+  .stars{color:#e0a11b;font-weight:700;font-size:14px}
+  .badge{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;background:#eaf6f4;color:var(--green);margin-top:8px}
+  .band{color:var(--brand-d);font-weight:700}
+
+  .safety{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .sbox{padding:14px;border-radius:13px;border:1px solid var(--line)}
+  .sbox h5{margin:0 0 8px;font-size:14px;display:flex;align-items:center;gap:7px}
+  .sbox ul{margin:0;padding-left:16px} .sbox li{font-size:13.5px;margin:5px 0;color:#334155}
+  .s-road{background:#f4f7ff} .s-nat{background:#f2fbf6} .s-area{background:#fff7f2}
+  .overall{margin-top:14px;padding:12px 14px;border-radius:12px;background:#f3f7f6;border:1px solid var(--line);font-weight:600}
+
+  .pack{display:flex;flex-wrap:wrap;gap:9px}
+  .pack span{background:#eef2f7;border:1px solid var(--line);border-radius:999px;padding:8px 13px;font-size:13.5px}
+
+  footer{color:var(--muted);font-size:13px;text-align:center;padding:26px 0 40px}
+  footer code{background:#e6ecf3;padding:2px 6px;border-radius:6px}
+
+  @media(max-width:900px){.form{grid-template-columns:1fr 1fr}.two{grid-template-columns:1fr}.cards,.safety{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="nav">
+      <div class="brand"><span class="logo"></span> Wanderwise <small>AI Road-Trip Concierge</small></div>
+      <small>Powered by Amazon Bedrock&nbsp;·&nbsp;Nova</small>
+    </div>
+    <div class="hero">
+      <h1>Plan the whole journey, not just the destination.</h1>
+      <p>Enter where you're starting and where you're headed. An AI agent checks the real weather at both ends, maps a sensible route, and composes your day — meal stops, family-friendly hotels, kids' play areas, timing, and layered safety checks.</p>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="panel form">
+    <div class="field"><label>From</label><input id="from" placeholder="e.g. California" autocomplete="off"/></div>
+    <div class="field"><label>To</label><input id="to" placeholder="e.g. Texas" autocomplete="off"/></div>
+    <div class="field"><label>Travel date</label><input id="date" type="date"/></div>
+    <div class="field"><label>Trip style</label>
+      <select id="style">
+        <option value="family road trip with kids">Family road trip (kids)</option>
+        <option value="relaxed couples getaway">Couples getaway</option>
+        <option value="solo adventure road trip">Solo adventure</option>
+        <option value="friends group road trip">Friends group</option>
+        <option value="scenic slow travel">Scenic / slow travel</option>
+      </select>
+    </div>
+    <button class="go" id="go">Plan my trip →</button>
+  </div>
+</div>
+
+<main class="wrap">
+  <div class="hint" id="hint">Tip: try <b>San Francisco → Los Angeles</b>, <b>London → Edinburgh</b>, or <b>Mumbai → Goa</b>.</div>
+
+  <div class="panel loader" id="loader">
+    <div class="steps" id="steps">
+      <div class="step" data-k="geo"><span class="dot"></span>Locating both places</div>
+      <div class="step" data-k="wx"><span class="dot"></span>Checking real weather</div>
+      <div class="step" data-k="route"><span class="dot"></span>Mapping the route</div>
+      <div class="step" data-k="agent"><span class="dot"></span>Agent composing itinerary</div>
+    </div>
+  </div>
+
+  <div class="err" id="err"></div>
+
+  <div id="out" class="grid">
+    <div class="panel headline" id="headline"></div>
+
+    <div class="two">
+      <div id="map"></div>
+      <div class="wcards" id="weather"></div>
+    </div>
+
+    <div class="panel sec"><h3><span class="icn">🗺️</span> Route</h3><div id="route"></div></div>
+    <div class="panel sec"><h3><span class="icn">⏱️</span> Your day, hour by hour</h3><p class="sub">Timings estimated from the drive length — adjust to taste.</p><div class="timeline" id="timeline"></div></div>
+    <div class="panel sec"><h3><span class="icn">🍽️</span> Where to eat</h3><p class="sub">Breakfast, lunch and dinner spaced along the drive.</p><div class="cards" id="meals"></div></div>
+    <div class="panel sec"><h3><span class="icn">🏨</span> Where to stay</h3><div class="cards" id="hotels"></div></div>
+    <div class="panel sec"><h3><span class="icn">🧸</span> For the kids</h3><div class="cards two2" id="kids"></div></div>
+    <div class="panel sec"><h3><span class="icn">🛡️</span> Safety check</h3><p class="sub">Road, natural and area-level notes for this route and season.</p><div class="safety" id="safety"></div><div class="overall" id="overall"></div></div>
+    <div class="panel sec"><h3><span class="icn">🎒</span> Don't forget to pack</h3><div class="pack" id="pack"></div></div>
+  </div>
+</main>
+
+<footer class="wrap">
+  Wanderwise · AWS Lambda + Amazon Bedrock (Nova) · real weather &amp; geocoding via Open-Meteo.
+  Suggestions are AI-generated — verify opening hours and bookings before you travel.
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const el = (t,c,h)=>{const e=document.createElement(t); if(c)e.className=c; if(h!=null)e.innerHTML=h; return e;};
+const esc = s => (s==null?"":String(s)).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+const stars = r => {r=Math.max(0,Math.min(5,Number(r)||0)); const f=Math.round(r); return "★".repeat(f)+"☆".repeat(5-f)+" "+r.toFixed(1);};
+const wxIcon = c => c==0?"☀️":c<=2?"🌤️":c==3?"☁️":[45,48].includes(c)?"🌫️":(c>=51&&c<=67)?"🌧️":(c>=71&&c<=86)?"❄️":(c>=95)?"⛈️":"🌡️";
+
+// default date = today
+$("#date").value = new Date().toISOString().slice(0,10);
+
+let map, layer;
+function drawMap(o,d){
+  if(!map){ map = L.map('map',{scrollWheelZoom:false});
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      {maxZoom:18, attribution:'&copy; OpenStreetMap'}).addTo(map); }
+  if(layer) layer.remove();
+  layer = L.layerGroup().addTo(map);
+  const teal="#0d9488";
+  const A=[o.lat,o.lon], B=[d.lat,d.lon];
+  L.marker(A).addTo(layer).bindPopup("<b>Start</b><br>"+esc(o.name));
+  L.marker(B).addTo(layer).bindPopup("<b>Destination</b><br>"+esc(d.name));
+  L.polyline([A,B],{color:teal,weight:4,opacity:.75,dashArray:"2,8"}).addTo(layer);
+  map.fitBounds(L.latLngBounds([A,B]).pad(0.35));
+  setTimeout(()=>map.invalidateSize(),120);
+}
+
+function weatherCard(title, w){
+  if(!w||!w.available) return `<div class="wcard"><div class="top"><h4>${esc(title)}</h4><div class="ico">🌡️</div></div><div class="meta">Forecast unavailable for this date.</div></div>`;
+  return `<div class="wcard"><div class="top"><h4>${esc(title)}</h4><div class="ico">${wxIcon(w.code)}</div></div>
+    <div class="t">${Math.round(w.temp_max_c)}°<span style="font-size:15px;color:var(--muted)"> / ${Math.round(w.temp_min_c)}°C</span></div>
+    <div class="meta">${esc(w.summary)} · 💧 ${w.rain_chance_pct}% rain · 💨 ${Math.round(w.wind_max_kmh)} km/h</div></div>`;
+}
+
+function mealCard(label, m){
+  if(!m) return "";
+  return `<div class="c"><div class="k">${esc(label)} · ${esc(m.approx_time||"")}</div>
+    <div class="n">${esc(m.place||"—")}</div>
+    <div class="m">${esc(m.town||"")}${m.cuisine?" · "+esc(m.cuisine):""}</div>
+    <div class="stars">${stars(m.rating)}</div>
+    <div class="w">${esc(m.why||"")}</div></div>`;
+}
+
+function render(res){
+  const d=res.data, p=res.plan||{};
+  // headline + chips
+  const hc = $("#headline");
+  const km = d.route?Math.round(d.route.driving_km):"—";
+  const hrs = d.route?d.route.drive_hours:"—";
+  hc.innerHTML = `<h2>${esc(p.headline||("Trip to "+(d.destination.name||"")))}</h2>
+    <p>${esc(p.overview||"")}</p>
+    <div class="chips">
+      <div class="chip"><b>${km} km</b><span>Driving distance</span></div>
+      <div class="chip"><b>~${hrs} h</b><span>Estimated drive</span></div>
+      <div class="chip"><b>${esc(p.timing?.suggested_start||"—")}</b><span>Suggested start</span></div>
+      <div class="chip"><b>${esc(p.timing?.estimated_arrival||"—")}</b><span>Approx. arrival</span></div>
+      <div class="chip"><b>${esc(p.timing?.recommended_stay||"—")}</b><span>Recommended stay</span></div>
+    </div>`;
+
+  drawMap(d.origin, d.destination);
+  $("#weather").innerHTML = weatherCard(d.origin.name+" (start)", d.weather.origin)
+                          + weatherCard(d.destination.name+" (destination)", d.weather.destination);
+
+  // route
+  const r=p.route||{};
+  $("#route").innerHTML = `<div class="c"><div class="w" style="margin-top:0">${esc(r.summary||"")}</div>
+    ${(r.major_roads&&r.major_roads.length)?`<div class="m" style="margin-top:8px"><b>Main roads:</b> ${r.major_roads.map(esc).join(" · ")}</div>`:""}
+    ${(r.waypoints&&r.waypoints.length)?`<div class="m" style="margin-top:8px"><b>Along the way:</b> ${r.waypoints.map(w=>esc(w.name)).join(" → ")}</div>`:""}</div>`;
+
+  // timeline (start + meals + rest + arrive)
+  const tl=$("#timeline"); tl.innerHTML="";
+  const items=[];
+  if(p.timing?.suggested_start) items.push([p.timing.suggested_start,"Depart "+d.origin.name,"Fuel up and hit the road."]);
+  const M=p.meals||{};
+  ["breakfast","lunch","dinner"].forEach(k=>{ if(M[k]) items.push([M[k].approx_time,(k[0].toUpperCase()+k.slice(1))+" · "+(M[k].place||""),(M[k].town||"")+(M[k].why?" — "+M[k].why:"")]); });
+  (p.rest_breaks||[]).forEach(b=>items.push([b.approx_time,"Rest break · "+(b.place||b.town||""),b.note||""]));
+  if(p.timing?.estimated_arrival) items.push([p.timing.estimated_arrival,"Arrive "+d.destination.name,"Check in and unwind."]);
+  items.sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
+  items.forEach(it=>{const n=el("div","tl"); n.innerHTML=`<div class="tm">${esc(it[0]||"")}</div><div class="ti">${esc(it[1])}</div><div class="td">${esc(it[2])}</div>`; tl.appendChild(n);});
+
+  $("#meals").innerHTML = mealCard("Breakfast",M.breakfast)+mealCard("Lunch",M.lunch)+mealCard("Dinner",M.dinner);
+
+  // hotels
+  $("#hotels").innerHTML = (p.hotels||[]).map(h=>`<div class="c">
+    <div class="n">${esc(h.name||"—")}</div>
+    <div class="m">${esc(h.area||"")} · <span class="band">${esc(h.price_band||"")}</span></div>
+    <div class="stars">${stars(h.rating)}</div>
+    <div class="w">${esc(h.why||"")}</div>
+    ${h.family_friendly?'<div class="badge">Family-friendly</div>':''}</div>`).join("") || '<div class="m">No hotels suggested.</div>';
+
+  // kids
+  $("#kids").innerHTML = (p.kids_play_areas||[]).map(k=>`<div class="c">
+    <div class="k">${esc(k.type||"For kids")}</div>
+    <div class="n">${esc(k.name||"—")}</div>
+    <div class="w">${esc(k.note||"")}</div></div>`).join("") || '<div class="m">No kids\' areas listed for this trip style.</div>';
+
+  // safety
+  const s=p.safety||{};
+  const box=(cls,ico,title,arr)=>`<div class="sbox ${cls}"><h5>${ico} ${title}</h5><ul>${(arr||[]).map(x=>`<li>${esc(x)}</li>`).join("")||"<li>No specific notes.</li>"}</ul></div>`;
+  $("#safety").innerHTML = box("s-road","🚗","Road & driving",s.road)+box("s-nat","⛰️","Natural & seasonal",s.natural)+box("s-area","📍","Area safety",s.area);
+  $("#overall").innerHTML = s.overall?("🛡️ "+esc(s.overall)):"";
+
+  // packing
+  $("#pack").innerHTML = (p.packing||[]).map(x=>`<span>${esc(x)}</span>`).join("") || '<span>Standard travel kit</span>';
+
+  $("#out").classList.add("on");
+}
+
+// loading choreography (visual only; the request runs in parallel)
+function runSteps(){
+  const order=["geo","wx","route","agent"];
+  const steps=[...document.querySelectorAll('.step')];
+  steps.forEach(s=>s.classList.remove('act','done'));
+  let i=0;
+  steps[0].classList.add('act');
+  return setInterval(()=>{ if(i<steps.length-1){ steps[i].classList.remove('act'); steps[i].classList.add('done'); i++; steps[i].classList.add('act'); } }, 900);
+}
+
+async function plan(){
+  const from=$("#from").value.trim(), to=$("#to").value.trim();
+  $("#err").classList.remove("on"); 
+  if(!from||!to){ $("#err").textContent="Please enter both a start and a destination."; $("#err").classList.add("on"); return; }
+  $("#out").classList.remove("on"); $("#hint").style.display="none";
+  $("#go").disabled=true; $("#loader").classList.add("on");
+  const timer=runSteps();
+  try{
+    const resp=await fetch(location.href,{method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({from,to,date:$("#date").value,style:$("#style").value})});
+    const res=await resp.json();
+    clearInterval(timer);
+    if(!res.ok){ throw new Error(res.error||"Something went wrong."); }
+    document.querySelectorAll('.step').forEach(s=>{s.classList.remove('act');s.classList.add('done');});
+    setTimeout(()=>{ $("#loader").classList.remove("on"); render(res); window.scrollTo({top:$("#out").offsetTop-20,behavior:"smooth"}); }, 350);
+  }catch(e){
+    clearInterval(timer); $("#loader").classList.remove("on");
+    $("#err").textContent="⚠ "+e.message; $("#err").classList.add("on");
+  }finally{ $("#go").disabled=false; }
+}
+$("#go").addEventListener("click",plan);
+["from","to"].forEach(id=>$("#"+id).addEventListener("keydown",e=>{if(e.key==="Enter")plan();}));
+</script>
+</body>
+</html>
