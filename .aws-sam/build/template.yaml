@@ -1,0 +1,47 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'Wanderwise - AI road-trip concierge. One Lambda behind a Function URL
+  that serves the UI and runs a Bedrock Nova Lite agent (Converse tool-use loop).
+  Real weather + geocoding via Open-Meteo (no API key). Free-Tier friendly.
+
+  '
+Parameters:
+  ModelId:
+    Type: String
+    Default: us.amazon.nova-lite-v1:0
+    Description: Bedrock model / cross-region inference profile ID.
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 60
+    MemorySize: 512
+Resources:
+  WanderwiseFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: app.handler
+      CodeUri: WanderwiseFn
+      Description: Wanderwise trip-planning agent + UI
+      Environment:
+        Variables:
+          MODEL_ID:
+            Ref: ModelId
+      FunctionUrlConfig:
+        AuthType: NONE
+      Policies:
+      - Statement:
+        - Sid: InvokeNovaLite
+          Effect: Allow
+          Action: bedrock:InvokeModel
+          Resource:
+          - Fn::Sub: arn:aws:bedrock:*::foundation-model/amazon.nova-lite-v1:0
+          - Fn::Sub: arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/us.amazon.nova-lite-v1:0
+    Metadata:
+      SamResourceId: WanderwiseFn
+Outputs:
+  AppUrl:
+    Description: Open this in your browser to use Wanderwise.
+    Value:
+      Fn::GetAtt:
+      - WanderwiseFnUrl
+      - FunctionUrl

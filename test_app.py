@@ -6,6 +6,8 @@ def fake_get_json(url):
     if "geocoding-api" in url:
         if "Bengaluru" in url:
             return {"results":[{"name":"Bengaluru","admin1":"Karnataka","country":"India","latitude":12.97,"longitude":77.59}]}
+        if "New+York" in url or "New%20York" in url or "New York" in url:
+            return {"results":[{"name":"New York","admin1":"New York","country":"United States","latitude":40.7128,"longitude":-74.0060}]}
         return {"results":[{"name":"Ooty","admin1":"Tamil Nadu","country":"India","latitude":11.41,"longitude":76.69}]}
     if "forecast" in url:
         return {"daily":{"time":["2026-08-15"],"weathercode":[61],"temperature_2m_max":[24.5],
@@ -61,4 +63,12 @@ print("empty-from -> status", b["statusCode"])
 
 # 5) date clamp
 print("clamp(none) ->", app._clamp_date(None), "| clamp(2000-01-01) ->", app._clamp_date("2000-01-01"))
+
+# 6) place search endpoint returns suggestions
+s = app.handler({"requestContext":{"http":{"method":"GET","path":"/search"}},"multiValueQueryStringParameters":{"q":["New York"]}}, None)
+assert s["statusCode"] == 200
+body = json.loads(s["body"])
+assert body["ok"] is True and len(body["results"]) >= 1
+assert "New York" in body["results"][0]["name"]
+print("search endpoint ->", body["results"][0]["name"])
 print("\nALL TESTS PASSED")
